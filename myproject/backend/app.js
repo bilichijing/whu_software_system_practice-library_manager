@@ -1122,66 +1122,106 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
   }
 });
 
+// 更新过期预约状态的函数
+async function updateExpiredBookings() {
+  return new Promise((resolve, reject) => {
+    const now = new Date();
+    const currentDate = now.toISOString().split('T')[0];
+    const currentTime = now.toTimeString().slice(0, 5);
+    
+    // 更新过期的预约状态为 'completed'
+    const updateQuery = `
+      UPDATE bookings 
+      SET status = 'completed' 
+      WHERE status = 'active' 
+        AND (
+          (booking_date < ?) OR 
+          (booking_date = ? AND end_time < ?)
+        )
+    `;
+    
+    db.run(updateQuery, [currentDate, currentDate, currentTime], function(err) {
+      if (err) {
+        console.error('更新过期预约状态失败:', err);
+        reject(err);
+      } else {
+        if (this.changes > 0) {
+          console.log(`已更新 ${this.changes} 个过期预约状态为已完成`);
+        }
+        resolve();
+      }
+    });
+  });
+}
+
 // 获取用户预约记录
-app.get('/api/bookings', authenticateToken, (req, res) => {
+app.get('/api/bookings', authenticateToken, async (req, res) => {
   const user_id = req.user.id;
   const { status, page = 1, pageSize = 10 } = req.query;
   
-  let whereClause = 'WHERE b.user_id = ?';
-  let params = [user_id];
-  
-  if (status) {
-    whereClause += ' AND b.status = ?';
-    params.push(status);
-  }
-  
-  const offset = (page - 1) * pageSize;
-  
-  const query = `
-    SELECT 
-      b.id,
-      b.booking_date,
-      b.start_time,
-      b.end_time,
-      b.status,
-      b.check_in_time,
-      b.created_at,
-      s.seat_number,
-      sr.name as room_name,
-      sr.floor,
-      sr.area
-    FROM bookings b
-    JOIN seats s ON b.seat_id = s.id
-    JOIN study_rooms sr ON s.room_id = sr.id
-    ${whereClause}
-    ORDER BY b.booking_date DESC, b.start_time DESC
-    LIMIT ? OFFSET ?
-  `;
-  
-  const countQuery = `
-    SELECT COUNT(*) as total
-    FROM bookings b
-    ${whereClause}
-  `;
-  
-  db.get(countQuery, params, (err, countResult) => {
-    if (err) {
-      return res.status(500).json({ error: '获取预约记录失败' });
+  try {
+    // 首先更新过期预约状态
+    await updateExpiredBookings();
+    
+    let whereClause = 'WHERE b.user_id = ?';
+    let params = [user_id];
+    
+    if (status) {
+      whereClause += ' AND b.status = ?';
+      params.push(status);
     }
     
-    db.all(query, [...params, pageSize, offset], (err, bookings) => {
+    const offset = (page - 1) * pageSize;
+    
+    const query = `
+      SELECT 
+        b.id,
+        b.booking_date,
+        b.start_time,
+        b.end_time,
+        b.status,
+        b.check_in_time,
+        b.created_at,
+        s.seat_number,
+        sr.name as room_name,
+        sr.floor,
+        sr.area
+      FROM bookings b
+      JOIN seats s ON b.seat_id = s.id
+      JOIN study_rooms sr ON s.room_id = sr.id
+      ${whereClause}
+      ORDER BY b.booking_date DESC, b.start_time DESC
+      LIMIT ? OFFSET ?
+    `;
+    
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM bookings b
+      ${whereClause}
+    `;
+    
+    db.get(countQuery, params, (err, countResult) => {
       if (err) {
         return res.status(500).json({ error: '获取预约记录失败' });
       }
       
-      res.json({
-        records: bookings,
-        total: countResult.total,
-        page: parseInt(page),
-        pageSize: parseInt(pageSize)
+      db.all(query, [...params, pageSize, offset], (err, bookings) => {
+        if (err) {
+          return res.status(500).json({ error: '获取预约记录失败' });
+        }
+        
+        res.json({
+          records: bookings,
+          total: countResult.total,
+          page: parseInt(page),
+          pageSize: parseInt(pageSize)
+        });
       });
     });
-  });
+  } catch (error) {
+    console.error('获取预约记录失败:', error);
+    res.status(500).json({ error: '获取预约记录失败' });
+  }
 });
 
 // 取消预约
@@ -1307,6 +1347,23 @@ app.put('/api/bookings/:id/checkin', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('签到失败:', error);
     res.status(500).json({ error: '签到失败' });
+  }
+});
+
+// 更新过期预约状态（管理员API）
+app.post('/api/admin/update-expired-bookings', authenticateToken, async (req, res) => {
+  try {
+    await updateExpiredBookings();
+    res.json({ 
+      message: '过期预约状态更新完成',
+      success: true 
+    });
+  } catch (error) {
+    console.error('更新过期预约状态失败:', error);
+    res.status(500).json({ 
+      error: '更新过期预约状态失败',
+      success: false 
+    });
   }
 });
 
