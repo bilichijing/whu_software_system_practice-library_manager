@@ -30,9 +30,9 @@
         </el-col>
       </el-row>
 
-      <!-- 第三行：积分历史和测试功能 -->
+      <!-- 第三行：积分历史 -->
       <el-row :gutter="20" class="bottom-row">
-        <el-col :span="16">
+        <el-col :span="24">
           <PointsHistory 
             :history="pointsHistory"
             :current-page="currentPage"
@@ -41,17 +41,6 @@
             @refresh="loadPointsHistory"
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
-          />
-        </el-col>
-        <el-col :span="8">
-          <TestActions 
-            :loading="loading"
-            @booking-success="handleBookingSuccess"
-            @check-in="handleCheckIn"
-            @submit-rating="handleSubmitRating"
-            @no-show="handleNoShow"
-            @manual-adjust="handleManualAdjust"
-            @high-quality-rating="handleHighQualityRating"
           />
         </el-col>
       </el-row>
@@ -97,7 +86,6 @@ import PointsOverview from '@/components/PointsOverview.vue'
 import LevelBenefits from '@/components/LevelBenefits.vue'
 import PointsRules from '@/components/PointsRules.vue'
 import PointsHistory from '@/components/PointsHistory.vue'
-import TestActions from '@/components/TestActions.vue'
 
 export default {
   name: 'PointsManagement',
@@ -105,8 +93,7 @@ export default {
     PointsOverview,
     LevelBenefits,
     PointsRules,
-    PointsHistory,
-    TestActions
+    PointsHistory
   },
   setup() {
     const router = useRouter()
@@ -202,120 +189,6 @@ export default {
       loadPointsHistory()
     }
     
-    const handleBookingSuccess = async () => {
-      loading.booking = true
-      try {
-        const token = localStorage.getItem('token')
-        await axios.post('/api/points/booking-success', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        ElMessage.success('预约成功积分已添加')
-        loadPointsLevel()
-        loadPointsHistory()
-      } catch (error) {
-        ElMessage.error('操作失败')
-      } finally {
-        loading.booking = false
-      }
-    }
-    
-    const handleCheckIn = async () => {
-      loading.checkIn = true
-      try {
-        const token = localStorage.getItem('token')
-        await axios.post('/api/points/check-in', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        ElMessage.success('签到积分已添加')
-        loadPointsLevel()
-        loadPointsHistory()
-      } catch (error) {
-        ElMessage.error('操作失败')
-      } finally {
-        loading.checkIn = false
-      }
-    }
-    
-    const handleSubmitRating = async () => {
-      loading.rating = true
-      try {
-        const token = localStorage.getItem('token')
-        await axios.post('/api/points/submit-rating', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        ElMessage.success('评价积分已添加')
-        loadPointsLevel()
-        loadPointsHistory()
-      } catch (error) {
-        ElMessage.error('操作失败')
-      } finally {
-        loading.rating = false
-      }
-    }
-    
-    const handleNoShow = async () => {
-      loading.noShow = true
-      try {
-        const token = localStorage.getItem('token')
-        await axios.post('/api/points/no-show', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        ElMessage.success('爽约扣除积分已执行')
-        loadPointsLevel()
-        loadPointsHistory()
-      } catch (error) {
-        ElMessage.error('操作失败')
-      } finally {
-        loading.noShow = false
-      }
-    }
-    
-    const handleManualAdjust = () => {
-      adjustForm.points = 0
-      adjustForm.reason = ''
-      adjustDialogVisible.value = true
-    }
-    
-    const confirmAdjust = async () => {
-      if (!adjustForm.reason.trim()) {
-        ElMessage.warning('请输入调整原因')
-        return
-      }
-      
-      loading.adjust = true
-      try {
-        const token = localStorage.getItem('token')
-        await axios.post('/api/points/adjust', adjustForm, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        ElMessage.success('积分调整成功')
-        adjustDialogVisible.value = false
-        loadPointsLevel()
-        loadPointsHistory()
-      } catch (error) {
-        ElMessage.error('调整失败')
-      } finally {
-        loading.adjust = false
-      }
-    }
-    
-    const handleHighQualityRating = async () => {
-      loading.highQuality = true
-      try {
-        const token = localStorage.getItem('token')
-        await axios.post('/api/points/high-quality-rating', {}, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        ElMessage.success('优质评价积分已添加')
-        loadPointsLevel()
-        loadPointsHistory()
-      } catch (error) {
-        ElMessage.error('操作失败')
-      } finally {
-        loading.highQuality = false
-      }
-    }
-    
     // 生命周期
     onMounted(() => {
       loadPointsLevel()
@@ -339,14 +212,7 @@ export default {
       loadPointsRules,
       loadPointsHistory,
       handleSizeChange,
-      handleCurrentChange,
-      handleBookingSuccess,
-      handleCheckIn,
-      handleSubmitRating,
-      handleNoShow,
-      handleManualAdjust,
-      confirmAdjust,
-      handleHighQualityRating
+      handleCurrentChange
     }
   }
 }

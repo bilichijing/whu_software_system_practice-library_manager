@@ -68,7 +68,7 @@
       <el-card>
         <template #header>
           <div class="card-header">
-            <span>我的评价记录</span>
+            <span>全部评价记录</span>
             <el-button type="primary" @click="showRatingDialog">
               提交新评价
             </el-button>
@@ -98,6 +98,7 @@
                 </div>
                 <div class="rating-meta">
                   <span class="rating-date">{{ formatDate(rating.created_at) }}</span>
+                  <span class="rating-username">{{ rating.username }}</span>
                   <span v-if="rating.room_name" class="rating-location">
                     {{ rating.room_name }} - {{ rating.seat_number }}
                   </span>
@@ -199,7 +200,7 @@ export default {
     }
     
     const formatDate = (dateString) => {
-      return new Date(dateString).toLocaleString('zh-CN')
+      return new Date(dateString).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
     }
     
     const getTagType = (count) => {

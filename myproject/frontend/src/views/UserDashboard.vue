@@ -92,11 +92,7 @@
                   </div>
                 </div>
                 <div class="points-buttons">
-                  <el-button type="primary" size="large" class="points-button" @click="showPointsHistory">
-                    <el-icon><Document /></el-icon>
-                    <span>查看积分历史</span>
-                  </el-button>
-                  <el-button type="success" size="large" class="points-button" @click="goToPointsManagement">
+                  <el-button type="primary" size="large" class="points-button" @click="goToPoints">
                     <el-icon><Star /></el-icon>
                     <span>积分管理</span>
                   </el-button>
@@ -206,6 +202,7 @@
                 <div v-for="rating in ratings" :key="rating.id" class="rating-item">
                   <div class="rating-header">
                     <span class="rating-date">{{ formatDate(rating.created_at) }}</span>
+                    <span class="rating-username">{{ rating.username }}</span>
                     <el-rate v-model="rating.rating" disabled />
                   </div>
                   <div class="rating-comment" v-if="rating.comment">
@@ -511,7 +508,7 @@ export default {
 .points-card {
   height: 100% !important;
   min-height: 400px !important;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: #fff;
   border: 1px solid #e4e7ed;
   border-radius: 12px;
   overflow: hidden;
@@ -645,7 +642,7 @@ export default {
 .actions-card {
   height: 100% !important;
   min-height: 400px !important;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: #fff;
   border: 1px solid #e4e7ed;
   border-radius: 12px;
   overflow: hidden;
@@ -772,14 +769,24 @@ export default {
 
 .rating-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
+  gap: 12px;
   margin-bottom: 10px;
 }
 
 .rating-date {
   color: #909399;
   font-size: 12px;
+}
+
+.rating-username {
+  color: #909399;
+  font-size: 12px;
+  text-align: left;
+  margin-left: 8px;
+  min-width: 60px;
+  display: inline-block;
 }
 
 .rating-comment {

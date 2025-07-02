@@ -573,17 +573,16 @@ app.get('/api/user/points', authenticateToken, (req, res) => {
 
 // 获取用户评价记录API
 app.get('/api/user/ratings', authenticateToken, (req, res) => {
-  const userId = req.user.id;
+  // const userId = req.user.id;
 
   const getRatings = `
     SELECT r.*, u.username
     FROM user_ratings r
     JOIN users u ON r.user_id = u.id
-    WHERE r.user_id = ?
     ORDER BY r.created_at DESC
   `;
 
-  db.all(getRatings, [userId], (err, ratings) => {
+  db.all(getRatings, [], (err, ratings) => {
     if (err) {
       console.error('获取评价记录失败:', err);
       return res.status(500).json({ error: '获取评价记录失败' });
@@ -770,8 +769,8 @@ app.post('/api/user/rating', authenticateToken, async (req, res) => {
 
     // 插入评价记录
     db.run(
-      'INSERT INTO user_ratings (user_id, booking_id, rating, comment, tags, rating_type) VALUES (?, ?, ?, ?, ?, ?)',
-      [userId, safeBookingId, rating, safeComment, safeTags, ratingType],
+      'INSERT INTO user_ratings (user_id, booking_id, rating, comment, tags, rating_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [userId, safeBookingId, rating, safeComment, safeTags, ratingType, new Date().toISOString()],
       async function(err) {
         if (err) {
           console.error('评价插入失败:', err);
@@ -1030,10 +1029,11 @@ app.post('/api/bookings', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: '开始时间必须早于结束时间' });
   }
   
-  // 验证预约日期不能是过去
-  const today = new Date().toISOString().split('T')[0];
-  if (booking_date < today) {
-    return res.status(400).json({ error: '不能预约过去的日期' });
+  // 校验预约时间必须在当前系统时间之后
+  const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const bookingDateTime = new Date(`${booking_date}T${start_time}`);
+  if (bookingDateTime <= now) {
+    return res.status(400).json({ error: '只能预约当前时间之后的时间段' });
   }
   
   try {
@@ -1214,15 +1214,6 @@ app.put('/api/bookings/:id/cancel', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: '预约已取消或已完成' });
     }
     
-    // 检查是否可以取消（提前2小时）
-    const bookingDateTime = new Date(`${booking.booking_date} ${booking.start_time}`);
-    const now = new Date();
-    const hoursDiff = (bookingDateTime - now) / (1000 * 60 * 60);
-    
-    if (hoursDiff < 2) {
-      return res.status(400).json({ error: '预约开始前2小时内不能取消' });
-    }
-    
     // 更新预约状态
     const updateQuery = 'UPDATE bookings SET status = ? WHERE id = ?';
     await new Promise((resolve, reject) => {
@@ -1287,7 +1278,7 @@ app.put('/api/bookings/:id/checkin', authenticateToken, async (req, res) => {
     }
     
     // 检查是否在预约时间段内
-    const now = new Date();
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
     const currentTime = now.toTimeString().slice(0, 5);
     const startTime = booking.start_time;
     const endTime = booking.end_time;
@@ -1317,6 +1308,93 @@ app.put('/api/bookings/:id/checkin', authenticateToken, async (req, res) => {
     console.error('签到失败:', error);
     res.status(500).json({ error: '签到失败' });
   }
+});
+
+// 清空数据库记录（仅用于开发调试）
+app.delete('/api/admin/clear-data', authenticateToken, (req, res) => {
+  // 注意：这里应该添加管理员权限检查，暂时跳过
+  console.log('开始清空数据库记录...');
+  
+  // 清空预约记录
+  db.run('DELETE FROM bookings', (err) => {
+    if (err) {
+      console.error('清空预约记录失败:', err);
+      return res.status(500).json({ error: '清空预约记录失败' });
+    }
+    
+    console.log('预约记录已清空');
+    
+    // 清空评价记录
+    db.run('DELETE FROM user_ratings', (err) => {
+      if (err) {
+        console.error('清空评价记录失败:', err);
+        return res.status(500).json({ error: '清空评价记录失败' });
+      }
+      
+      console.log('评价记录已清空');
+      
+      // 重置自增ID
+      db.run('DELETE FROM sqlite_sequence WHERE name IN ("bookings", "user_ratings")', (err) => {
+        if (err) {
+          console.error('重置自增ID失败:', err);
+          // 不返回错误，因为这不是关键操作
+        } else {
+          console.log('自增ID已重置');
+        }
+        
+        res.json({ 
+          message: '数据库记录清空成功',
+          cleared: {
+            bookings: '预约记录已清空',
+            ratings: '评价记录已清空'
+          }
+        });
+      });
+    });
+  });
+});
+
+// 临时清空数据库端点（无需认证，仅用于开发调试）
+app.delete('/api/dev/clear-data', (req, res) => {
+  console.log('开始清空数据库记录（开发模式）...');
+  
+  // 清空预约记录
+  db.run('DELETE FROM bookings', (err) => {
+    if (err) {
+      console.error('清空预约记录失败:', err);
+      return res.status(500).json({ error: '清空预约记录失败' });
+    }
+    
+    console.log('预约记录已清空');
+    
+    // 清空评价记录
+    db.run('DELETE FROM user_ratings', (err) => {
+      if (err) {
+        console.error('清空评价记录失败:', err);
+        return res.status(500).json({ error: '清空评价记录失败' });
+      }
+      
+      console.log('评价记录已清空');
+      
+      // 重置自增ID
+      db.run('DELETE FROM sqlite_sequence WHERE name IN ("bookings", "user_ratings")', (err) => {
+        if (err) {
+          console.error('重置自增ID失败:', err);
+          // 不返回错误，因为这不是关键操作
+        } else {
+          console.log('自增ID已重置');
+        }
+        
+        res.json({ 
+          message: '数据库记录清空成功（开发模式）',
+          cleared: {
+            bookings: '预约记录已清空',
+            ratings: '评价记录已清空'
+          }
+        });
+      });
+    });
+  });
 });
 
 // 启动服务器

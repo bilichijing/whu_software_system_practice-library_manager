@@ -11,7 +11,7 @@
       <el-card class="filter-card">
         <el-form :inline="true" :model="filterForm">
           <el-form-item label="状态">
-            <el-select v-model="filterForm.status" placeholder="全部状态" @change="loadBookings">
+            <el-select v-model="filterForm.status" placeholder="全部状态" @change="loadBookings" style="width: 160px" clearable>
               <el-option label="全部" value="" />
               <el-option label="进行中" value="active" />
               <el-option label="已完成" value="completed" />
@@ -201,11 +201,11 @@ export default {
     }
     
     const formatDate = (dateString) => {
-      return new Date(dateString).toLocaleDateString('zh-CN')
+      return new Date(dateString).toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
     }
     
     const formatDateTime = (dateString) => {
-      return new Date(dateString).toLocaleString('zh-CN')
+      return new Date(dateString).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
     }
     
     const getStatusType = (status) => {
@@ -238,10 +238,68 @@ export default {
     }
     
     const canCancel = (booking) => {
-      const bookingDateTime = new Date(`${booking.booking_date} ${booking.start_time}`)
-      const now = new Date()
-      const hoursDiff = (bookingDateTime - now) / (1000 * 60 * 60)
-      return hoursDiff >= 2
+      try {
+        // 正确处理时区转换
+        let bookingDate
+        if (booking.booking_date.includes('T')) {
+          // 如果是ISO格式，先转换为本地时间，再提取日期
+          const utcDate = new Date(booking.booking_date)
+          if (isNaN(utcDate.getTime())) {
+            console.error('无效的UTC日期:', booking.booking_date)
+            return false
+          }
+          // 使用toLocaleDateString获取北京时间，然后转换为标准格式
+          const localDateString = utcDate.toLocaleDateString('zh-CN', { timeZone: 'Asia/Shanghai' })
+          // 解析格式为 YYYY/M/D 或 YYYY/M/DD 的字符串
+          const parts = localDateString.split('/')
+          if (parts.length === 3) {
+            const year = parts[0]
+            const month = parts[1].padStart(2, '0')
+            const day = parts[2].padStart(2, '0')
+            bookingDate = `${year}-${month}-${day}`
+          } else {
+            console.error('无法解析本地日期字符串:', localDateString)
+            return false
+          }
+        } else {
+          // 如果已经是日期格式，直接使用
+          bookingDate = booking.booking_date
+        }
+        
+        // 创建预约开始时间（使用本地时间）
+        const bookingStartDateTime = new Date(`${bookingDate}T${booking.start_time}:00`)
+        if (isNaN(bookingStartDateTime.getTime())) {
+          console.error('无效的预约开始时间:', `${bookingDate}T${booking.start_time}:00`)
+          return false
+        }
+        
+        const now = new Date()
+        
+        // 临时调试信息
+        console.log('=== canCancel 调试信息 ===')
+        console.log('预约ID:', booking.id)
+        console.log('原始预约日期:', booking.booking_date)
+        console.log('UTC时间对象:', new Date(booking.booking_date))
+        console.log('处理后的日期:', bookingDate)
+        console.log('预约开始时间:', booking.start_time)
+        console.log('完整预约开始时间字符串:', `${bookingDate}T${booking.start_time}:00`)
+        console.log('bookingStartDateTime:', bookingStartDateTime)
+        console.log('bookingStartDateTime.toISOString():', bookingStartDateTime.toISOString())
+        console.log('bookingStartDateTime.toLocaleString():', bookingStartDateTime.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }))
+        console.log('now:', now)
+        console.log('now.toISOString():', now.toISOString())
+        console.log('now.toLocaleString():', now.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }))
+        console.log('bookingStartDateTime > now:', bookingStartDateTime > now)
+        console.log('时间差(毫秒):', bookingStartDateTime.getTime() - now.getTime())
+        console.log('时间差(小时):', (bookingStartDateTime.getTime() - now.getTime()) / (1000 * 60 * 60))
+        console.log('========================')
+        
+        return bookingStartDateTime > now
+      } catch (error) {
+        console.error('canCancel函数出错:', error)
+        console.error('预约数据:', booking)
+        return false
+      }
     }
     
     const handleCheckIn = async (booking) => {
